@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>DamiTools — Payment</title>
+  <style>
+    body{font-family:system-ui,Arial;margin:0;padding:18px;background:#f6f7fb;color:#111}
+    .card{max-width:720px;margin:24px auto;padding:18px;background:#fff;border-radius:12px;border:1px solid rgba(0,0,0,0.06)}
+    button{padding:10px;border-radius:8px;border:none;background:#10b981;color:#fff;cursor:pointer}
+    .muted{color:#666}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Payment</h2>
+    <div id="orderSummary" style="margin-bottom:12px"></div>
+    <p class="muted">You will be redirected to Paystack to complete the payment.</p>
+    <div style="display:flex;gap:8px">
+      <button id="payNow">Pay now</button>
+      <button id="cancel" style="background:#ef4444">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Paystack inline -->
+  <script src="https://js.paystack.co/v1/inline.js"></script>
+  <script>
+    // Use the live publishable key as requested
+    const PAYSTACK_KEY = "pk_live_a7cf2c8bc42437f38fee38ffd85ba652cf518258";
+
+    const cart = JSON.parse(localStorage.getItem('damitools_cart')||'[]');
+    const delivery = JSON.parse(localStorage.getItem('damitools_delivery')||'null');
+
+    if(!cart.length){ document.getElementById('orderSummary').innerHTML = '<p>Cart is empty. Go back to shop.</p>'; }
+    else {
+      const itemsHtml = cart.map(i=>`<div>${i.name} × ${i.qty} — ₦${(i.price*i.qty).toLocaleString()}</div>`).join('');
+      const total = cart.reduce((s,i)=>s+i.price*i.qty,0);
+      document.getElementById('orderSummary').innerHTML = `${itemsHtml}<div style="margin-top:6px"><strong>Total:</strong> ₦${total.toLocaleString()}</div><div style="margin-top:8px" class="muted">Deliver to: ${delivery ? (delivery.name + ', ' + delivery.address + ', ' + delivery.state) : 'No delivery info'}</div>`;
+    }
+
+    document.getElementById('cancel').addEventListener('click', ()=> location.href='index.html');
+
+    document.getElementById('payNow').addEventListener('click', ()=>{
+      const total = cart.reduce((s,i)=>s+i.price*i.qty,0);
+      if(!total){ alert('Cart empty'); return; }
+      const handler = PaystackPop.setup({
+        key: PAYSTACK_KEY,
+        email: (delivery && delivery.phone) ? delivery.name.replace(/\s+/g,'') + '@damitools.local' : 'customer@damitools.local',
+        amount: total * 100, // in kobo
+        currency: "NGN",
+        ref: 'DT-'+Date.now(),
+        metadata: {
+          custom_fields: [
+            { display_name: "Phone", variable_name: "phone", value: delivery ? delivery.phone : ''},
+            { display_name: "DeliveryAddress", variable_name: "delivery_address", value: delivery ? delivery.address : ''}
+          ]
+        },
+        callback: function(response){
+          // PAYMENT SUCCESSFUL (client-side)
+          // response.reference contains the Paystack transaction reference
+          // IMPORTANT: Server-side verification is REQUIRED — see notes below.
+          alert('Payment successful. Reference: ' + response.reference);
+          // Save an order locally and try to send to Firestore if available
+          const order = { id: Date.now(), ref: response.reference, items: cart, total, delivery: delivery, method: 'Paystack' };
+          const ordersLocal = JSON.parse(localStorage.getItem('damitools_orders')||'[]'); ordersLocal.push(order); localStorage.setItem('damitools_orders', JSON.stringify(ordersLocal));
+          // optionally: call a server endpoint to verify and record the payment (recommended)
+          // Redirect to confirmation (you can show a fun message here)
+          setTimeout(()=> {
+            alert("Woohoo! Your order is on the move! Get ready — DamiTools got you covered 🚚🎉");
+            // clear cart
+            localStorage.removeItem('damitools_cart');
+            location.href='index.html';
+          }, 600);
+        },
+        onClose: function(){
+          alert('Payment window closed. If you completed payment, contact support.');
+        }
+      });
+      handler.openIframe();
+    });
+
+    /*
+     * SECURITY NOTE — SERVER-SIDE VERIFICATION (Must implement)
+     * --------------------------------------------------------
+     * After Paystack returns a successful transaction reference, your server should call:
+     *  GET https://api.paystack.co/transaction/verify/{reference}
+     * with Authorization: Bearer <PAYSTACK_SECRET_KEY>
+     *
+     * Example Node/Express:
+     *  const fetch = require('node-fetch');
+     *  async function verify(ref){
+     *    const res = await fetch(`https://api.paystack.co/transaction/verify/${ref}`, {
+     *      headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET}` }
+     *    });
+     *    return res.json();
+     *  }
+     *
+     * Do not rely on client-side responses alone.
+     */
+  </script>
+</body>
+</html>
