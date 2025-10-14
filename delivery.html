@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>DamiTools — Delivery Details</title>
+  <style>
+    body{font-family:system-ui,Arial;margin:0;padding:18px;background:#f6f7fb;color:#111}
+    .card{max-width:720px;margin:24px auto;padding:18px;background:#fff;border-radius:12px;border:1px solid rgba(0,0,0,0.06)}
+    input,textarea,select{width:100%;padding:10px;margin-top:6px;border-radius:8px;border:1px solid #e6e6e6}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    button{padding:10px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Delivery details</h2>
+    <p style="color:#666">Fill the delivery address for your order.</p>
+
+    <div id="cartSummary" style="margin-bottom:12px;color:#333"></div>
+
+    <label>Full name</label>
+    <input id="inpName" placeholder="John Doe">
+
+    <label>Phone number</label>
+    <input id="inpPhone" placeholder="08123456789">
+
+    <label>State</label>
+    <select id="inpState">
+      <option>Lagos</option>
+      <option>Abuja</option>
+      <option>Oyo</option>
+      <option>Rivers</option>
+      <option>Other</option>
+    </select>
+
+    <label>Address</label>
+    <textarea id="inpAddress" rows="3" placeholder="Street, area, near landmark"></textarea>
+
+    <label>Notes (optional)</label>
+    <textarea id="inpNotes" rows="2" placeholder="Leave at security / call on arrival"></textarea>
+
+    <div style="margin-top:12px;text-align:right">
+      <button id="continueToPay">Continue to Payment</button>
+    </div>
+  </div>
+
+  <script>
+    // load cart
+    const cart = JSON.parse(localStorage.getItem('damitools_cart')||'[]');
+    const summary = cart.length ? cart.map(i=>`${i.name} × ${i.qty}`).join('<br>') + `<br><strong>Total:</strong> ₦${cart.reduce((s,i)=>s+i.price*i.qty,0).toLocaleString()}` : 'Cart empty';
+    document.getElementById('cartSummary').innerHTML = summary;
+
+    document.getElementById('continueToPay').addEventListener('click', ()=>{
+      const name = document.getElementById('inpName').value.trim();
+      const phone = document.getElementById('inpPhone').value.trim();
+      const address = document.getElementById('inpAddress').value.trim();
+      const state = document.getElementById('inpState').value;
+      const notes = document.getElementById('inpNotes').value.trim();
+
+      if(!name || !phone || !address){ alert('Please fill name, phone and address'); return; }
+
+      const delivery = { name, phone, address, state, notes };
+      localStorage.setItem('damitools_delivery', JSON.stringify(delivery));
+      // go to payment page
+      location.href = 'payment.html';
+    });
+  </script>
+</body>
+</html>
